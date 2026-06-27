@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ortak Emetörlü Yükselteç Simülatörü</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="2" y="2" width="20" height="20" rx="3" stroke="#2bd17e" stroke-width="1.6"/>
+      <path d="M6 12h3l1.5-4 3 8 1.5-4h3" stroke="#2bd17e" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <h1>Ortak Emetörlü Yükselteç Simülatörü</h1>
+      <span class="sub">DC analiz &amp; AC küçük işaret (hibrit-π) analizi — Proje 4</span>
+    </div>
+  </div>
+  <div class="region-pill" id="regionPill"><span class="dot"></span><span id="regionText">AKTİF</span></div>
+</header>
+
+<main class="layout">
+
+  <!-- BLOCK 1: CE amplifier circuit + element sliders -->
+  <section class="block">
+    <div class="block-head"><span class="idx">1</span><h2>Ortak Emetörlü Yükselteç Devresi</h2></div>
+    <div class="schematic-wrap" id="schAmp"></div>
+    <div class="toolbar">
+      <h3>Eleman Değerleri (Araç Çubuğu)</h3>
+      <div class="controls" id="controls"></div>
+    </div>
+  </section>
+
+  <!-- BLOCK 2: DC equivalent + operating point -->
+  <section class="block">
+    <div class="block-head"><span class="idx">2</span><h2>DC Eş Değer Devre</h2></div>
+    <div class="schematic-wrap" id="schDC"></div>
+    <div class="readout">
+      <h3>Sessiz Çalışma Noktası &amp; Çalışma Bölgesi</h3>
+      <div class="metrics" id="dcMetrics"></div>
+      <div class="region-banner" id="regionBanner"></div>
+    </div>
+  </section>
+
+  <!-- BLOCK 3: AC equivalent + gains + waveform -->
+  <section class="block">
+    <div class="block-head"><span class="idx">3</span><h2>AC Eş Değer Devre (Hibrit-π)</h2></div>
+    <div class="schematic-wrap" id="schAC"></div>
+    <div class="readout">
+      <h3>Kazançlar &amp; Dirençler</h3>
+      <div class="metrics" id="acMetrics"></div>
+      <h3 class="plot-title">Giriş–Çıkış Gerilim Grafiği (zaman ekseni)</h3>
+      <div class="plot-wrap">
+        <canvas id="plot" width="760" height="280"></canvas>
+        <div class="legend">
+          <span class="lg"><i style="background:#39b6ff"></i> v<sub>i</sub>(t) — giriş</span>
+          <span class="lg"><i style="background:#ff6b6b"></i> v<sub>o</sub>(t) — çıkış</span>
+        </div>
+        <div class="clip-warn" id="clipWarn"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  Hibrit-π küçük işaret modeli · V<sub>BE</sub>≈0,7&nbsp;V · V<sub>T</sub>≈26&nbsp;mV — Sedra/Smith, Boylestad, IIT Bombay ders notu temelli.
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
