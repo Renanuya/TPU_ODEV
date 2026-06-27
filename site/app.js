@@ -336,11 +336,11 @@ function plot(r){
   const x0=padL,x1=W-padR,y0=padT,y1=H-padB, mid=(y0+y1)/2;
   ctx.clearRect(0,0,W,H);
   // bg
-  ctx.fillStyle="#181b22"; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle="#fbfaf5"; ctx.fillRect(0,0,W,H);
   const warn=document.getElementById("clipWarn");
 
   if(!r.active){
-    ctx.fillStyle="#8b93a3"; ctx.font="13px 'JetBrains Mono'"; ctx.textAlign="center";
+    ctx.fillStyle="#8a877d"; ctx.font="13px 'JetBrains Mono'"; ctx.textAlign="center";
     ctx.fillText("Transistör aktif bölgede değil — dalga biçimi yok.", W/2, mid);
     warn.textContent=""; return;
   }
@@ -353,13 +353,13 @@ function plot(r){
   const vy = v => mid - (v/scaleMax)*(mid-y0);
 
   // grid
-  ctx.strokeStyle="#23272f"; ctx.lineWidth=1;
+  ctx.strokeStyle="#e3ded2"; ctx.lineWidth=1;
   for(let i=0;i<=8;i++){const x=x0+(x1-x0)*i/8;ctx.beginPath();ctx.moveTo(x,y0);ctx.lineTo(x,y1);ctx.stroke();}
   for(let i=0;i<=4;i++){const y=y0+(y1-y0)*i/4;ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();}
   // zero axis
-  ctx.strokeStyle="#3a4150"; ctx.beginPath();ctx.moveTo(x0,mid);ctx.lineTo(x1,mid);ctx.stroke();
+  ctx.strokeStyle="#c3bdb0"; ctx.beginPath();ctx.moveTo(x0,mid);ctx.lineTo(x1,mid);ctx.stroke();
   // y labels
-  ctx.fillStyle="#8b93a3"; ctx.font="10px 'JetBrains Mono'"; ctx.textAlign="right";
+  ctx.fillStyle="#8a877d"; ctx.font="10px 'JetBrains Mono'"; ctx.textAlign="right";
   ctx.fillText("+"+scaleMax.toFixed(2)+"V",x0-6,y0+8);
   ctx.fillText("0",x0-6,mid+3);
   ctx.fillText("-"+scaleMax.toFixed(2)+"V",x0-6,y1);
@@ -379,8 +379,8 @@ function plot(r){
     ctx.stroke();
   }
   // vi (blue), vo inverted (phase pi), clamp vo to headroom
-  draw(viA,0,"#39b6ff",null);
-  draw(voA,Math.PI,"#ff6b6b",clipped?head:null);
+  draw(viA,0,"#1f5fd6",null);
+  draw(voA,Math.PI,"#c0392b",clipped?head:null);
 
   warn.textContent = clipped
     ? `⚠ Çıkış kırpılıyor: |v_o| tepe ${(voA*1000).toFixed(0)} mV > salınım sınırı ${(head*1000).toFixed(0)} mV. Giriş genliğini düşür.`
