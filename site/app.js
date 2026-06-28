@@ -2,19 +2,23 @@
 
 /* ===== constants ===== */
 const VBE = 0.7, VT = 0.026, VCESAT = 0.2;
+const TAU = Math.PI*2;
 
 /* ===== slider params ===== */
 const PARAMS = [
-  { id:"VCC",  name:"V<sub>CC</sub>", min:5,    max:18,   step:0.5, val:12,   unit:"V",  fmt:"V" },
-  { id:"R1",   name:"R₁",            min:10000,max:100000,step:1000,val:47000,unit:"Ω", fmt:"R" },
-  { id:"R2",   name:"R₂",            min:2000, max:47000,step:500, val:10000,unit:"Ω", fmt:"R" },
-  { id:"RC",   name:"R<sub>C</sub>", min:500,  max:10000,step:100, val:2200, unit:"Ω", fmt:"R" },
-  { id:"RE",   name:"R<sub>E</sub>", min:100,  max:5000, step:100, val:1000, unit:"Ω", fmt:"R" },
-  { id:"RL",   name:"R<sub>L</sub>", min:1000, max:100000,step:1000,val:10000,unit:"Ω", fmt:"R" },
-  { id:"Rs",   name:"R<sub>s</sub>", min:50,   max:2000, step:50,  val:600,  unit:"Ω", fmt:"R" },
-  { id:"beta", name:"β (h<sub>FE</sub>)", min:50, max:400, step:10, val:150, unit:"", fmt:"int" },
-  { id:"vs",   name:"v<sub>s</sub> genlik", min:1, max:50, step:1, val:10, unit:"mV", fmt:"mV" },
-  { id:"freq", name:"frekans", min:100, max:5000, step:100, val:1000, unit:"Hz", fmt:"Hz" },
+  { id:"VCC",  name:"V<sub>CC</sub>", min:5,    max:18,   step:0.5, val:12,   unit:"V",  fmt:"V",  grp:"Besleme & Öngerilim" },
+  { id:"R1",   name:"R₁",            min:10000,max:100000,step:1000,val:47000,unit:"Ω", fmt:"R",  grp:"Besleme & Öngerilim" },
+  { id:"R2",   name:"R₂",            min:2000, max:47000,step:500, val:10000,unit:"Ω", fmt:"R",  grp:"Besleme & Öngerilim" },
+  { id:"RC",   name:"R<sub>C</sub>", min:500,  max:10000,step:100, val:2200, unit:"Ω", fmt:"R",  grp:"Yük & Dirençler" },
+  { id:"RE",   name:"R<sub>E</sub>", min:100,  max:5000, step:100, val:1000, unit:"Ω", fmt:"R",  grp:"Yük & Dirençler" },
+  { id:"RL",   name:"R<sub>L</sub>", min:1000, max:100000,step:1000,val:10000,unit:"Ω", fmt:"R",  grp:"Yük & Dirençler" },
+  { id:"Rs",   name:"R<sub>s</sub>", min:50,   max:2000, step:50,  val:600,  unit:"Ω", fmt:"R",  grp:"Yük & Dirençler" },
+  { id:"CB",   name:"C<sub>B</sub>", min:0.1,  max:100,  step:0.1, val:10,   unit:"µF", fmt:"uF", grp:"Kondansatörler" },
+  { id:"CC",   name:"C<sub>C</sub>", min:0.1,  max:100,  step:0.1, val:10,   unit:"µF", fmt:"uF", grp:"Kondansatörler" },
+  { id:"CE",   name:"C<sub>E</sub>", min:1,    max:470,  step:1,   val:100,  unit:"µF", fmt:"uF", grp:"Kondansatörler" },
+  { id:"beta", name:"β (h<sub>FE</sub>)", min:50, max:400, step:10, val:150, unit:"", fmt:"int",  grp:"Transistör" },
+  { id:"vs",   name:"v<sub>s</sub> genlik", min:1, max:50, step:1, val:10, unit:"mV", fmt:"mV",   grp:"Giriş İşareti" },
+  { id:"freq", name:"frekans", min:100, max:5000, step:100, val:1000, unit:"Hz", fmt:"Hz",       grp:"Giriş İşareti" },
 ];
 const S = {};
 PARAMS.forEach(p => S[p.id] = p.val);
@@ -37,16 +41,93 @@ function fmtParam(p,v){
   if(p.fmt==="V") return v.toFixed(1)+" V";
   if(p.fmt==="int") return String(Math.round(v));
   if(p.fmt==="mV") return v+" mV";
+  if(p.fmt==="uF") return (Number.isInteger(v)?v:v.toFixed(1))+" µF";
   if(p.fmt==="Hz") return v>=1000?(v/1000)+" kHz":v+" Hz";
   return v;
 }
 
+/* ===== complex AC helpers ===== */
+function complex(real, imag){
+  return { re:real, im:imag||0 };
+}
+function cAdd(a,b){ return complex(a.re+b.re,a.im+b.im); }
+function cSub(a,b){ return complex(a.re-b.re,a.im-b.im); }
+function cMul(a,b){ return complex(a.re*b.re-a.im*b.im,a.re*b.im+a.im*b.re); }
+function cDiv(a,b){
+  const denom=b.re*b.re+b.im*b.im;
+  return complex((a.re*b.re+a.im*b.im)/denom,(a.im*b.re-a.re*b.im)/denom);
+}
+function cInv(a){ return cDiv(complex(1),a); }
+function cAbs(a){ return Math.hypot(a.re,a.im); }
+function cScale(a,scale){ return complex(a.re*scale,a.im*scale); }
+function cParallel(a,b){ return cInv(cAdd(cInv(a),cInv(b))); }
+function capZ(capacitanceUf, freq){
+  const capacitance=Math.max(capacitanceUf,0.001)*1e-6;
+  return complex(0,-1/(TAU*Math.max(freq,1)*capacitance));
+}
+function signedGain(value){
+  const mag=cAbs(value);
+  return value.re<0 ? -mag : mag;
+}
+function solveComplexLinear(matrix, vector){
+  const size=vector.length;
+  const a=matrix.map(row=>row.map(cell=>complex(cell.re,cell.im)));
+  const b=vector.map(cell=>complex(cell.re,cell.im));
+
+  for(let col=0; col<size; col++){
+    let pivot=col;
+    for(let row=col+1; row<size; row++){
+      if(cAbs(a[row][col])>cAbs(a[pivot][col])) pivot=row;
+    }
+    if(pivot!==col){
+      [a[col],a[pivot]]=[a[pivot],a[col]];
+      [b[col],b[pivot]]=[b[pivot],b[col]];
+    }
+    for(let row=col+1; row<size; row++){
+      const factor=cDiv(a[row][col],a[col][col]);
+      for(let k=col; k<size; k++) a[row][k]=cSub(a[row][k],cMul(factor,a[col][k]));
+      b[row]=cSub(b[row],cMul(factor,b[col]));
+    }
+  }
+
+  const x=Array(size).fill(null).map(()=>complex(0));
+  for(let row=size-1; row>=0; row--){
+    let sum=complex(0);
+    for(let col=row+1; col<size; col++) sum=cAdd(sum,cMul(a[row][col],x[col]));
+    x[row]=cDiv(cSub(b[row],sum),a[row][row]);
+  }
+  return x;
+}
+
+function solveSmallSignal(params){
+  const rb=par(params.R1,params.R2);
+  const zSrc=cAdd(complex(params.Rs),capZ(params.CB,params.freq));
+  const zEmitter=cParallel(complex(params.RE),capZ(params.CE,params.freq));
+  const zOutCap=capZ(params.CC,params.freq);
+  const ySrc=cInv(zSrc), yBias=cInv(complex(rb)), yPi=cInv(complex(params.rpi));
+  const yEmitter=cInv(zEmitter), yRc=cInv(complex(params.RC));
+  const yOutCap=cInv(zOutCap), yLoad=cInv(complex(params.RL));
+  const gm=complex(params.gm);
+  const source=complex(params.vsAmp);
+
+  const matrix=[
+    [cAdd(cAdd(ySrc,yBias),yPi), cScale(yPi,-1), complex(0), complex(0)],
+    [cScale(cAdd(yPi,gm),-1), cAdd(cAdd(yPi,yEmitter),gm), complex(0), complex(0)],
+    [gm, cScale(gm,-1), cAdd(yRc,yOutCap), cScale(yOutCap,-1)],
+    [complex(0), complex(0), cScale(yOutCap,-1), cAdd(yOutCap,yLoad)]
+  ];
+  const vector=[cMul(source,ySrc), complex(0), complex(0), complex(0)];
+  const [vb,ve,vc,vo]=solveComplexLinear(matrix,vector);
+  const inputCurrent=cMul(cSub(source,vb),ySrc);
+  return { vb, ve, vc, vo, inputCurrent, rb };
+}
+
 /* ===== core physics ===== */
 function solve(){
-  const {VCC,R1,R2,RC,RE,RL,Rs,beta} = S;
+  const {VCC,R1,R2,RC,RE,RL,Rs,beta,CB,CC,CE,freq} = S;
   const vsAmp = S.vs/1000; // V
 
-  // DC — voltage divider Thevenin
+  // DC ·voltage divider Thevenin
   const VTh = VCC*R2/(R1+R2);
   const RTh = par(R1,R2);
 
@@ -70,27 +151,39 @@ function solve(){
   const active = region==="AKTİF";
   const ICQ = IC;
 
-  // AC — hybrid-pi (ro -> inf)
+  // AC ·hybrid-pi (ro -> inf)
   let gm=0, rpi=0, Rg=0, Kv=0, Kv0=0, Ro=RC, Ki=0, Kvs=0, viPeak=0, voPeak=0;
+  let viPhasor=complex(0), voPhasor=complex(0);
   if(active && ICQ>0){
     gm = ICQ/VT;
     rpi = beta/gm;
-    Rg = par(par(R1,R2),rpi);
-    const RCL = par(RC,RL);
-    Kv = -gm*RCL;
-    Kv0 = -gm*RC;
+    const acParams={VCC,R1,R2,RC,RE,RL,Rs,beta,CB,CC,CE,freq,gm,rpi,vsAmp};
+    const ac=solveSmallSignal(acParams);
+    const acOpen=solveSmallSignal({...acParams,RL:1e12});
+    const source=complex(vsAmp);
+    const inputCurrentMag=cAbs(ac.inputCurrent);
+    const kvComplex=cDiv(ac.vo,ac.vb);
+    const kv0Complex=cDiv(acOpen.vo,acOpen.vb);
+    const sourceToOutput=cDiv(ac.vo,source);
+    const loadCurrent=cDiv(ac.vo,complex(RL));
+    const currentGain=inputCurrentMag>1e-15 ? cDiv(loadCurrent,ac.inputCurrent) : complex(0);
+    Rg = inputCurrentMag>1e-15 ? cAbs(cDiv(ac.vb,ac.inputCurrent)) : 0;
+    Kv = signedGain(kvComplex);
+    Kv0 = signedGain(kv0Complex);
     Ro = RC;
-    Ki = Kv*Rg/RL;
-    Kvs = Kv*Rg/(Rg+Rs);
-    viPeak = vsAmp*Rg/(Rg+Rs);
-    voPeak = Kv*viPeak;
+    Ki = signedGain(currentGain);
+    Kvs = signedGain(sourceToOutput);
+    viPeak = cAbs(ac.vb);
+    voPeak = cAbs(ac.vo);
+    viPhasor = ac.vb;
+    voPhasor = ac.vo;
   }
 
   // output headroom for clipping
   const headroom = active ? Math.min(VCEq-VCESAT, ICQ*par(RC,RL)) : 0;
 
   return {VTh,RTh,IB,IC,IE,ICQ,VCEq,VE,VB,VCB,ICsat,region,active,
-          gm,rpi,Rg,Kv,Kv0,Ro,Ki,Kvs,viPeak,voPeak,headroom,vsAmp};
+          gm,rpi,Rg,Kv,Kv0,Ro,Ki,Kvs,viPeak,voPeak,viPhasor,voPhasor,headroom,vsAmp,freq};
 }
 
 /* ===== SVG schematic primitives ===== */
@@ -102,17 +195,22 @@ function gnd(x,y){ return `<g stroke="var(--accent)" stroke-width="2" fill="none
   <path d="M${x} ${y-10} L${x} ${y}"/><path d="M${x-11} ${y} L${x+11} ${y}"/>
   <path d="M${x-7} ${y+4} L${x+7} ${y+4}"/><path d="M${x-3} ${y+8} L${x+3} ${y+8}"/></g>`; }
 // resistor = box masking the wire (wire drawn separately/under)
-function resV(x,y1,y2,label,vid){
+function resV(x,y1,y2,label,vid,side){
   const m=(y1+y2)/2;
-  return `<rect x="${x-9}" y="${m-22}" width="18" height="44" rx="2" fill="${SB}" class="comp"/>
-    <text class="lbl" x="${x+15}" y="${m-4}">${label}</text>
-    <text class="lbl-v" id="${vid}" x="${x+15}" y="${m+10}"></text>`;
+  const left=side==="left";
+  const textX=left?x-14:x+15;
+  const anchor=left?' text-anchor="end"':"";
+  return `${wire(x,y1,x,y2)}
+    <rect x="${x-9}" y="${m-22}" width="18" height="44" rx="2" fill="${SB}" class="comp"/>
+    <text class="lbl" x="${textX}" y="${m-4}"${anchor}>${label}</text>
+    ${vid?`<text class="lbl-v" id="${vid}" x="${textX}" y="${m+10}"${anchor}></text>`:""}`;
 }
 function resH(x1,x2,y,label,vid){
   const m=(x1+x2)/2;
-  return `<rect x="${m-22}" y="${y-9}" width="44" height="18" rx="2" fill="${SB}" class="comp"/>
+  return `${wire(x1,y,x2,y)}
+    <rect x="${m-22}" y="${y-9}" width="44" height="18" rx="2" fill="${SB}" class="comp"/>
     <text class="lbl" x="${m}" y="${y-15}" text-anchor="middle">${label}</text>
-    <text class="lbl-v" id="${vid}" x="${m}" y="${y+24}" text-anchor="middle"></text>`;
+    ${vid?`<text class="lbl-v" id="${vid}" x="${m}" y="${y+24}" text-anchor="middle"></text>`:""}`;
 }
 function capV(x,y1,y2,label,vid){ // wire passes; gap with plates
   const m=(y1+y2)/2;
@@ -162,107 +260,118 @@ function drawAmp(){
   // base node
   g+=node(160,150);
   // R2
-  g+=wire(160,150,160,250)+resV(160,168,232,"R₂","ampR2")+gnd(160,262);
+  g+=wire(160,150,160,252)+resV(160,168,232,"R₂","ampR2")+gnd(160,262);
   // transistor
   g+=transistor(212,150);
   g+=wire(160,150,203,150); // base lead
-  g+=poly(`212 144 L228 132 L232 122`); // collector lead
-  g+=poly(`212 156 L228 168 L232 178`); // emitter lead
+  g+=`<text class="lbl-v" x="154" y="127" text-anchor="end">v<tspan dy='3'>i</tspan></text>`;
+  g+=poly(`219 133 L232 122`); // collector lead
+  g+=poly(`219 167 L232 178`); // emitter lead
   // RC + collector
   g+=wire(232,28,232,122)+resV(232,40,96,"R<tspan dy='3'>C</tspan>","ampRC");
   g+=node(232,108);
   // output coupling
   g+=wire(232,108,290,108)+capH(290,322,108,"C<tspan dy='3'>C</tspan>");
   g+=wire(322,108,360,108)+node(360,108);
-  g+=`<text class="lbl-v" x="366" y="104">v<tspan dy='3'>o</tspan></text>`;
+  g+=`<text class="lbl-v" x="360" y="97" text-anchor="middle">v<tspan dy='3'>o</tspan></text>`;
   // RL
-  g+=wire(360,108,360,150)+resV(360,150,214,"R<tspan dy='3'>L</tspan>","ampRL")+gnd(360,236);
+  g+=wire(360,108,360,226)+resV(360,150,214,"R<tspan dy='3'>L</tspan>","ampRL")+gnd(360,236);
   // emitter / RE
   g+=node(232,178);
-  g+=wire(232,178,232,208)+resV(232,210,276,"R<tspan dy='3'>E</tspan>","ampRE")+gnd(232,300);
+  g+=wire(232,178,232,290)+resV(232,210,276,"R<tspan dy='3'>E</tspan>","ampRE")+gnd(232,300);
   // CE bypass
-  g+=wire(232,208,300,208)+capV(300,208,260,"C<tspan dy='3'>E</tspan>")+gnd(300,272);
+  g+=node(232,208)+wire(232,208,300,208)+capV(300,208,260,"C<tspan dy='3'>E</tspan>")+gnd(300,270);
   // input source chain
   g+=source(40,150,"v<tspan dy='3'>s</tspan>");
   g+=wire(40,166,40,196)+gnd(40,196);
   g+=wire(56,150,74,150)+resH(74,110,150,"R<tspan dy='3'>s</tspan>","ampRs");
-  g+=wire(110,150,118,150)+capH(118,150,150,"C<tspan dy='3'>B</tspan>");
-  return svg("420 320",g);
+  g+=wire(110,150,118,150)+capH(118,150,150,"C<tspan dy='3'>B</tspan>")+wire(150,150,160,150);
+  return svg("480 340",g);
 }
 
 /* ===== Schematic 2: DC equivalent ===== */
 function drawDC(){
   let g="";
-  g+=wire(70,28,300,28);
+  // VCC rayı
+  g+=wire(70,28,400,28);
   g+=`<text class="rail-t" x="40" y="32">+Vcc</text>`;
-  g+=wire(140,28,140,150)+resV(140,40,116,"R₁","dcR1");
-  g+=node(140,150);
-  g+=wire(140,150,140,250)+resV(140,168,232,"R₂","dcR2")+gnd(140,262);
-  g+=transistor(192,150);
-  g+=wire(140,150,183,150);
-  g+=arrow(165,150,"r")+`<text class="lbl-v" id="dcIB" x="158" y="142" text-anchor="middle"></text><text class="lbl-m" x="150" y="166">I<tspan dy='3'>B</tspan></text>`;
-  g+=poly(`192 144 L208 132 L212 122`);
-  g+=poly(`192 156 L208 168 L212 178`);
-  g+=wire(212,28,212,122)+resV(212,40,96,"R<tspan dy='3'>C</tspan>","dcRC");
-  g+=arrow(212,112,"u","var(--accent-2)")+`<text class="lbl-v" id="dcIC" x="220" y="116"></text><text class="lbl-m" x="220" y="104">I<tspan dy='3'>C</tspan></text>`;
-  // VCE bracket
-  g+=`<path class="comp" d="M250 122 L258 122 M254 122 L254 178 M250 178 L258 178" opacity="0.7"/>`;
-  g+=`<text class="lbl-v" id="dcVCE" x="262" y="146"></text><text class="lbl-m" x="262" y="158">V<tspan dy='3'>CE</tspan></text>`;
-  g+=node(212,178);
-  g+=wire(212,178,212,208)+resV(212,210,276,"R<tspan dy='3'>E</tspan>","dcRE")+gnd(212,300);
-  g+=arrow(212,235,"d")+`<text class="lbl-v" id="dcIE" x="178" y="238" text-anchor="end"></text><text class="lbl-m" x="200" y="252" text-anchor="end">I<tspan dy='3'>E</tspan></text>`;
-  return svg("360 320",g);
+  // R1 / R2 bölücü (sol)
+  g+=wire(170,28,170,150)+resV(170,40,116,"R₁","dcR1");
+  g+=node(170,150);
+  g+=wire(170,150,170,252)+resV(170,168,232,"R₂","dcR2")+gnd(170,262);
+  // transistör (genişçe sağda)
+  g+=transistor(270,150);
+  g+=wire(170,150,259,150); // baz iletkeni
+  g+=arrow(212,150,"r")+`<text class="lbl-v" id="dcIB" x="212" y="142" text-anchor="middle"></text><text class="lbl-m" x="212" y="167" text-anchor="middle">I<tspan dy='3'>B</tspan></text>`;
+  // kollektör / emiter iletkenleri RC sütununa (x=310)
+  g+=poly(`277 133 L310 122`);
+  g+=poly(`277 167 L310 178`);
+  // RC (kollektör)
+  g+=wire(310,28,310,122)+resV(310,40,96,"R<tspan dy='3'>C</tspan>","dcRC");
+  g+=arrow(310,112,"u","var(--accent-2)")+`<text class="lbl-v" id="dcIC" x="320" y="116"></text><text class="lbl-m" x="320" y="104">I<tspan dy='3'>C</tspan></text>`;
+  // VCE köşeli ayraç (en sağ, ayrı sütun)
+  g+=`<path class="comp" d="M362 122 L370 122 M366 122 L366 178 M362 178 L370 178" opacity="0.7"/>`;
+  g+=`<text class="lbl-v" id="dcVCE" x="374" y="146"></text><text class="lbl-m" x="374" y="159">V<tspan dy='3'>CE</tspan></text>`;
+  g+=node(310,178);
+  // RE (emiter)
+  g+=wire(310,178,310,290)+resV(310,210,276,"R<tspan dy='3'>E</tspan>","dcRE")+gnd(310,300);
+  g+=arrow(310,235,"d")+`<text class="lbl-v" id="dcIE" x="276" y="238" text-anchor="end"></text><text class="lbl-m" x="300" y="253" text-anchor="end">I<tspan dy='3'>E</tspan></text>`;
+  return svg("480 340",g);
 }
 
 /* ===== Schematic 3: AC equivalent (hybrid-pi) ===== */
 function drawAC(){
   let g="";
-  // input
-  g+=source(35,150,"v<tspan dy='3'>s</tspan>");
-  g+=wire(35,166,35,196)+gnd(35,196);
-  g+=wire(51,150,66,150)+resH(66,102,150,"R<tspan dy='3'>s</tspan>",null);
-  g+=wire(102,150,140,150);
-  // base node
-  g+=node(140,150);
-  g+=`<text class="lbl-m" x="140" y="142" text-anchor="middle">B</text>`;
-  // RB = R1||R2
-  g+=wire(140,150,140,176)+resV(140,178,234,"R<tspan dy='3'>B</tspan>","acRB")+gnd(140,266);
-  // rpi
-  g+=wire(140,150,195,150)+node(195,150);
-  g+=wire(195,150,195,176)+resV(195,178,234,"r<tspan dy='3'>π</tspan>","acRpi")+gnd(195,266);
-  // vbe arrow
-  g+=`<path class="wire" d="M232 168 L232 232" stroke-dasharray="3 3" opacity="0.6"/>`;
-  g+=arrow(232,170,"u")+`<text class="lbl-v" x="238" y="204">v<tspan dy='3'>be</tspan></text>`;
-  // dashed divider
-  g+=`<path d="M260 30 L260 270" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
-  // collector rail
-  g+=wire(300,120,425,120);
-  g+=node(425,120);
-  g+=`<text class="lbl-m" x="305" y="112">C</text>`;
-  // dependent source (diamond) gm·vbe
+  // giriş kaynağı vs + Rs
+  g+=source(40,150,"v<tspan dy='3'>s</tspan>");
+  g+=wire(40,166,40,200)+gnd(40,200);
+  g+=wire(56,150,72,150)+resH(72,108,150,"R<tspan dy='3'>s</tspan>",null);
+  g+=wire(108,150,150,150);
+  // baz düğümü B
+  g+=node(150,150);
+  g+=`<text class="lbl-m" x="150" y="141" text-anchor="middle">B</text>`;
+  // RB = R1||R2  (baz → toprak)
+  g+=wire(150,150,150,260)+resV(150,180,236,"R<tspan dy='3'>B</tspan>","acRB","left")+gnd(150,260);
+  // rπ  (baz → toprak)
+  g+=wire(150,150,205,150)+node(205,150);
+  g+=wire(205,150,205,260)+resV(205,180,236,"r<tspan dy='3'>π</tspan>","acRpi")+gnd(205,260);
+  // vbe (rπ üzerindeki gerilim)
+  g+=`<path class="wire" d="M236 176 L236 232" stroke-dasharray="3 3" opacity="0.65"/>`;
+  g+=arrow(236,178,"u")+`<text class="lbl-v" x="244" y="186">v<tspan dy='3'>be</tspan></text>`;
+  // giriş | çıkış ayıracı
+  g+=`<path d="M262 44 L262 282" stroke="#b9b8ae" stroke-width="1.4" stroke-dasharray="5 4"/>`;
+  // kollektör rayı C
+  g+=wire(300,120,440,120)+node(300,120);
+  g+=`<text class="lbl-m" x="300" y="111" text-anchor="middle">C</text>`;
+  // bağımlı akım kaynağı gm·vbe (eşkenar dörtgen → toprak)
   g+=wire(300,120,300,150);
-  g+=`<path class="comp" d="M300 150 l15 16 l-15 16 l-15 -16 z" fill="${SB}"/>`;
-  g+=arrow(300,158,"u")+`<text class="lbl" x="282" y="172" text-anchor="end">g<tspan dy='3'>m</tspan>v<tspan dy='3'>be</tspan></text>`;
-  g+=wire(300,182,300,210)+gnd(300,210);
-  // ro
-  g+=wire(345,120,345,142)+resV(345,144,200,"r<tspan dy='3'>o</tspan>","acRo")+gnd(345,232);
-  // RC
-  g+=wire(385,120,385,142)+resV(385,144,200,"R<tspan dy='3'>C</tspan>",null)+gnd(385,232);
-  // RL + vo
-  g+=wire(425,120,425,142)+resV(425,144,200,"R<tspan dy='3'>L</tspan>",null)+gnd(425,232);
-  g+=`<text class="lbl-v" x="425" y="112" text-anchor="middle">v<tspan dy='3'>o</tspan></text>`;
-  return svg("470 290",g);
+  g+=`<path class="comp" d="M300 150 l15 17 l-15 17 l-15 -17 z" fill="${SB}"/>`;
+  g+=arrow(300,159,"u")+`<text class="lbl" x="318" y="171">g<tspan dy='3'>m</tspan>v<tspan dy='3'>be</tspan></text>`;
+  g+=wire(300,184,300,232)+gnd(300,232);
+  // ro, RC, RL  (raydan → toprak)
+  g+=node(345,120)+wire(345,120,345,232)+resV(345,150,206,"r<tspan dy='3'>o</tspan>","acRo")+gnd(345,232);
+  g+=node(392,120)+wire(392,120,392,232)+resV(392,150,206,"R<tspan dy='3'>C</tspan>",null)+gnd(392,232);
+  g+=wire(440,120,440,232)+resV(440,150,206,"R<tspan dy='3'>L</tspan>",null)+gnd(440,232);
+  // çıkış düğümü vo
+  g+=node(440,120);
+  g+=`<text class="lbl-v" x="440" y="111" text-anchor="middle">v<tspan dy='3'>o</tspan></text>`;
+  return svg("480 340",g);
 }
 
 /* ===== build controls ===== */
 function buildControls(){
   const c=document.getElementById("controls");
-  c.innerHTML = PARAMS.map(p=>`
+  let html="", curGrp="";
+  PARAMS.forEach(p=>{
+    if(p.grp!==curGrp){ curGrp=p.grp; html+=`<div class="ctrl-sec">${curGrp}</div>`; }
+    html+=`
     <div class="ctrl">
       <span class="name">${p.name}</span>
       <span class="val" id="val_${p.id}">${fmtParam(p,p.val)}</span>
       <input type="range" id="rng_${p.id}" min="${p.min}" max="${p.max}" step="${p.step}" value="${p.val}">
-    </div>`).join("");
+    </div>`;
+  });
+  c.innerHTML=html;
   PARAMS.forEach(p=>{
     document.getElementById("rng_"+p.id).addEventListener("input",e=>{
       S[p.id]=parseFloat(e.target.value);
@@ -272,41 +381,46 @@ function buildControls(){
   });
 }
 
-/* ===== metric card helper ===== */
-function metric(k,v,invalid){ return `<div class="metric${invalid?" invalid":""}"><span class="k">${k}</span><span class="v">${v}</span></div>`; }
+/* ===== KiCad tarzı sonuç tabloları ===== */
+function row(k,v,invalid){ return `<tr${invalid?' class="invalid"':''}><td class="k">${k}</td><td class="v">${v}</td></tr>`; }
 
-/* ===== render metrics ===== */
-function renderDC(r){
-  const el=document.getElementById("dcMetrics");
-  el.innerHTML =
-    metric("I<sub>B</sub>", fI(r.IB)) +
-    metric("I<sub>C</sub> (I<sub>CQ</sub>)", fI(r.IC)) +
-    metric("I<sub>E</sub>", fI(r.IE)) +
-    metric("V<sub>CE</sub>", fV(r.VCEq)) +
-    metric("V<sub>CB</sub>", fV(r.VCB)) +
-    metric("V<sub>BE</sub>", fV(r.region==="KESİM"?0:VBE));
+function renderResults(r){
+  const inv=!r.active;
+  // DC tablosu
+  const dc=document.getElementById("resDC");
+  dc.innerHTML =
+    `<tr><th>Büyüklük</th><th>Değer</th></tr>`+
+    row("I<sub>B</sub>", fI(r.IB)) +
+    row("I<sub>C</sub> (I<sub>CQ</sub>)", fI(r.IC)) +
+    row("I<sub>E</sub>", fI(r.IE)) +
+    row("V<sub>CE(Q)</sub>", fV(r.VCEq)) +
+    row("V<sub>E</sub>", fV(r.VE)) +
+    row("V<sub>CB</sub>", fV(r.VCB)) +
+    row("V<sub>BE</sub>", fV(r.region==="KESİM"?0:VBE)) +
+    row("I<sub>C(sat)</sub>", fI(r.ICsat)) +
+    row("V<sub>Th</sub>", fV(r.VTh)) +
+    row("R<sub>Th</sub>", fR(r.RTh));
+  // AC tablosu
+  const ac=document.getElementById("resAC");
+  ac.innerHTML =
+    `<tr><th>Büyüklük</th><th>Değer</th></tr>`+
+    row("K<sub>v</sub> (gerilim)", inv?"·":r.Kv.toFixed(1), inv) +
+    row("K<sub>v0</sub> (yüksüz)", inv?"·":r.Kv0.toFixed(1), inv) +
+    row("K<sub>i</sub> (akım)", inv?"·":r.Ki.toFixed(1), inv) +
+    row("K<sub>vg</sub> (kaynak→yük)", inv?"·":r.Kvs.toFixed(1), inv) +
+    row("R<sub>g</sub> (giriş)", inv?"·":fR(r.Rg), inv) +
+    row("R<sub>o</sub> (çıkış)", inv?"·":fR(r.Ro), inv) +
+    row("g<sub>m</sub>", inv?"·":(r.gm*1000).toFixed(2)+" mS", inv) +
+    row("r<sub>π</sub>", inv?"·":fR(r.rpi), inv) +
+    row("v<sub>o</sub> tepe", inv?"·":(Math.abs(r.voPeak)*1000).toFixed(1)+" mV", inv) +
+    row("v<sub>i</sub> tepe", inv?"·":(r.viPeak*1000).toFixed(1)+" mV", inv);
+  // bölge bandı
   const b=document.getElementById("regionBanner");
   let cls,msg;
-  if(r.region==="AKTİF"){cls="active"; msg=`● AKTİF BÖLGE — yükselteç olarak çalışıyor. I<sub>C(sat)</sub>=${fI(r.ICsat)}`;}
-  else if(r.region==="DOYMA"){cls="sat"; msg=`▲ DOYMA BÖLGESİ — V<sub>CE</sub>≤${VCESAT} V. AC kazançları geçersiz.`;}
-  else {cls="cut"; msg="✕ KESİM BÖLGESİ — transistör iletmiyor. AC kazançları geçersiz.";}
-  b.className="region-banner "+cls; b.innerHTML=msg;
-}
-function renderAC(r){
-  const el=document.getElementById("acMetrics");
-  const inv=!r.active;
-  const g=x=> inv?"—":x;
-  el.innerHTML =
-    metric("K<sub>v</sub> (gerilim)", inv?"—":r.Kv.toFixed(1), inv) +
-    metric("K<sub>v0</sub> (yüksüz)", inv?"—":r.Kv0.toFixed(1), inv) +
-    metric("K<sub>i</sub> (akım)", inv?"—":r.Ki.toFixed(1), inv) +
-    metric("K<sub>vg</sub> (kaynak→yük)", inv?"—":r.Kvs.toFixed(1), inv) +
-    metric("R<sub>g</sub> (giriş dir.)", inv?"—":fR(r.Rg), inv) +
-    metric("R<sub>o</sub> (çıkış dir.)", inv?"—":fR(r.Ro), inv) +
-    metric("g<sub>m</sub>", inv?"—":(r.gm*1000).toFixed(2)+" mS", inv) +
-    metric("r<sub>π</sub>", inv?"—":fR(r.rpi), inv) +
-    metric("v<sub>o</sub> tepe", inv?"—":(Math.abs(r.voPeak)*1000).toFixed(1)+" mV", inv) +
-    metric("v<sub>i</sub> tepe", inv?"—":(r.viPeak*1000).toFixed(1)+" mV", inv);
+  if(r.region==="AKTİF"){cls=""; msg=`AKTİF BÖLGE - yükselteç çalışıyor. I<sub>C(sat)</sub>=${fI(r.ICsat)}. Tablo 2 geçerli.`;}
+  else if(r.region==="DOYMA"){cls="sat"; msg=`DOYMA BÖLGESİ - V<sub>CE</sub>≤${VCESAT} V. AC kazançları geçersiz.`;}
+  else {cls="cut"; msg="KESİM BÖLGESİ - transistör iletmiyor. AC kazançları geçersiz.";}
+  b.className="hg-desc "+cls; b.innerHTML=msg;
 }
 
 /* ===== update schematic value labels ===== */
@@ -317,81 +431,114 @@ function updateLabels(r){
   setTxt("ampRE",fR(S.RE)); setTxt("ampRL",fR(S.RL)); setTxt("ampRs",fR(S.Rs));
   setTxt("dcR1",fR(S.R1)); setTxt("dcR2",fR(S.R2)); setTxt("dcRC",fR(S.RC)); setTxt("dcRE",fR(S.RE));
   setTxt("dcIB",fI(r.IB)); setTxt("dcIC",fI(r.IC)); setTxt("dcIE",fI(r.IE)); setTxt("dcVCE",fV(r.VCEq));
-  setTxt("acRB", r.active?fR(par(S.R1,S.R2)):"—");
-  setTxt("acRpi", r.active?fR(r.rpi):"—");
+  setTxt("acRB", r.active?fR(par(S.R1,S.R2)):"·");
+  setTxt("acRpi", r.active?fR(r.rpi):"·");
   setTxt("acRo","∞");
 }
 
 /* ===== region pill ===== */
 function renderPill(r){
   const p=document.getElementById("regionPill");
-  document.getElementById("regionText").textContent=r.region;
-  p.className="region-pill"+(r.region==="DOYMA"?" sat":r.region==="KESİM"?" cut":"");
+  const regionText=document.getElementById("regionText");
+  if(regionText) regionText.textContent=r.region;
+  const cls=r.region==="DOYMA"?" sat":r.region==="KESİM"?" cut":"";
+  if(p) p.className="region-pill"+cls;
+  // durum çubuğu bölge göstergesi
+  const sb=document.querySelector(".statusbar");
+  if(sb){
+    sb.className="statusbar"+cls;
+    const mark=r.region==="DOYMA"?"▲":r.region==="KESİM"?"✕":"●";
+    document.getElementById("sbRegion").textContent=mark+" "+r.region;
+  }
 }
 
 /* ===== waveform plot ===== */
 function plot(r){
   const cv=document.getElementById("plot"), ctx=cv.getContext("2d");
-  const W=cv.width,H=cv.height, padL=44,padR=14,padT=14,padB=26;
+  // keskin çizim: ekran piksel oranına göre arka tampon, CSS boyutuyla çiz
+  const dpr=window.devicePixelRatio||1;
+  const cssW=cv.clientWidth||760, cssH=cv.clientHeight||210;
+  cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const W=cssW,H=cssH, padL=44,padR=14,padT=14,padB=26;
   const x0=padL,x1=W-padR,y0=padT,y1=H-padB, mid=(y0+y1)/2;
   ctx.clearRect(0,0,W,H);
-  // bg
-  ctx.fillStyle="#fbfaf5"; ctx.fillRect(0,0,W,H);
+  // osiloskop ekranı (siyah)
+  ctx.fillStyle="#060606"; ctx.fillRect(0,0,W,H);
   const warn=document.getElementById("clipWarn");
+  const FM="'IBM Plex Mono'";
 
   if(!r.active){
-    ctx.fillStyle="#8a877d"; ctx.font="13px 'JetBrains Mono'"; ctx.textAlign="center";
-    ctx.fillText("Transistör aktif bölgede değil — dalga biçimi yok.", W/2, mid);
+    ctx.fillStyle="#9aa0a6"; ctx.font="13px "+FM; ctx.textAlign="center";
+    ctx.fillText("Transistör aktif bölgede değil · dalga biçimi yok.", W/2, mid);
     warn.textContent=""; return;
   }
 
-  // amplitude scaling
-  const viA=r.viPeak, voA=Math.abs(r.voPeak);
-  const head=r.headroom;
+  // dalga genliği (özgün mantık: iki iz merkezde, küçük işaret)
+  const viA=r.viPeak, voA=Math.abs(r.voPeak), head=r.headroom;
   const clipped = voA>head;
   const scaleMax = Math.max(voA, head, viA)*1.18;
   const vy = v => mid - (v/scaleMax)*(mid-y0);
+  const timeWindow = 0.005;
+  const omega = TAU*r.freq;
 
-  // grid
-  ctx.strokeStyle="#e3ded2"; ctx.lineWidth=1;
+  // beyaz noktalı ızgara
+  ctx.save();
+  ctx.setLineDash([1,3]); ctx.lineWidth=1; ctx.strokeStyle="rgba(255,255,255,0.18)";
   for(let i=0;i<=8;i++){const x=x0+(x1-x0)*i/8;ctx.beginPath();ctx.moveTo(x,y0);ctx.lineTo(x,y1);ctx.stroke();}
   for(let i=0;i<=4;i++){const y=y0+(y1-y0)*i/4;ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();}
-  // zero axis
-  ctx.strokeStyle="#c3bdb0"; ctx.beginPath();ctx.moveTo(x0,mid);ctx.lineTo(x1,mid);ctx.stroke();
-  // y labels
-  ctx.fillStyle="#8a877d"; ctx.font="10px 'JetBrains Mono'"; ctx.textAlign="right";
+  ctx.restore();
+  // çerçeve + sıfır ekseni
+  ctx.strokeStyle="rgba(255,255,255,0.32)";ctx.lineWidth=1;ctx.strokeRect(x0,y0,x1-x0,y1-y0);
+  ctx.strokeStyle="rgba(255,255,255,0.45)";ctx.beginPath();ctx.moveTo(x0,mid);ctx.lineTo(x1,mid);ctx.stroke();
+
+  // ekran etiketleri
+  ctx.fillStyle="#b9bfc6"; ctx.font="10px "+FM; ctx.textAlign="right";
   ctx.fillText("+"+scaleMax.toFixed(2)+"V",x0-6,y0+8);
   ctx.fillText("0",x0-6,mid+3);
   ctx.fillText("-"+scaleMax.toFixed(2)+"V",x0-6,y1);
-  ctx.textAlign="center"; ctx.fillText("t →",(x0+x1)/2,H-7);
+  ctx.textAlign="left"; ctx.fillStyle="#e02424"; ctx.fillText("v_o", x0+5, y0+12);
+  ctx.textAlign="right"; ctx.fillStyle="#2f9bef"; ctx.fillText("v_i", x1-5, y0+12);
+  const freqLabel=r.freq>=1000?(r.freq/1000).toFixed(r.freq%1000?1:0)+" kHz":r.freq+" Hz";
+  ctx.textAlign="left"; ctx.fillStyle="#9aa0a6"; ctx.fillText("0 ms",x0,H-7);
+  ctx.textAlign="center"; ctx.fillText(freqLabel,(x0+x1)/2,H-7);
+  ctx.textAlign="right"; ctx.fillText((timeWindow*1000).toFixed(1)+" ms",x1,H-7);
 
-  const N=600, periods=2;
-  // vo (red) — clamp to headroom if clipped
-  function draw(amp,phase,color,clamp){
-    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.beginPath();
+  const N=900;
+  function sample(phasor,time){
+    return phasor.re*Math.cos(omega*time) - phasor.im*Math.sin(omega*time);
+  }
+  function draw(phasor,color,clamp){
+    ctx.strokeStyle=color; ctx.lineWidth=1.8; ctx.lineJoin="round";
+    ctx.shadowColor=color; ctx.shadowBlur=6; ctx.beginPath();
     for(let i=0;i<=N;i++){
       const t=i/N;
-      let v=amp*Math.sin(2*Math.PI*periods*t+phase);
+      let v=sample(phasor,t*timeWindow);
       if(clamp!=null){ if(v>clamp)v=clamp; if(v<-clamp)v=-clamp; }
       const X=x0+(x1-x0)*t, Y=vy(v);
       i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);
     }
-    ctx.stroke();
+    ctx.stroke(); ctx.shadowBlur=0;
   }
-  // vi (blue), vo inverted (phase pi), clamp vo to headroom
-  draw(viA,0,"#1f5fd6",null);
-  draw(voA,Math.PI,"#c0392b",clipped?head:null);
+  // giriş (mavi) ve çıkış (kırmızı), frekans/faz küçük işaret çözümünden gelir
+  draw(r.viPhasor,"#2f9bef",null);
+  draw(r.voPhasor,"#e02424",clipped?head:null);
 
   warn.textContent = clipped
-    ? `⚠ Çıkış kırpılıyor: |v_o| tepe ${(voA*1000).toFixed(0)} mV > salınım sınırı ${(head*1000).toFixed(0)} mV. Giriş genliğini düşür.`
+    ? `Çıkış kırpılıyor: |v_o| tepe ${(voA*1000).toFixed(0)} mV > salınım sınırı ${(head*1000).toFixed(0)} mV. Giriş genliğini düşür.`
     : "";
 }
 
 /* ===== master update ===== */
+let lastResult=null;
 function update(){
   const r=solve();
-  renderPill(r); renderDC(r); renderAC(r); updateLabels(r); plot(r);
+  lastResult=r;
+  renderPill(r); renderResults(r); updateLabels(r); plot(r);
 }
+// pencere boyutu değişince grafiği yeniden çiz (keskin kalsın)
+let _rT;
+window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ if(lastResult) plot(lastResult); },120); });
 
 /* ===== init ===== */
 document.getElementById("schAmp").innerHTML=drawAmp();
@@ -399,3 +546,96 @@ document.getElementById("schDC").innerHTML=drawDC();
 document.getElementById("schAC").innerHTML=drawAC();
 buildControls();
 update();
+
+/* ===== EEschema durum çubuğu: imleç koordinatı + birim ===== */
+(function statusbar(){
+  // A4 yatay sayfa ölçüsü (KiCad varsayılanı)
+  const A4_W_MM=297, A4_H_MM=210, MM_PER_MIL=0.0254;
+  let unit="mm";                  // "mil" | "mm"
+  const anchor={x:0,y:0};
+  const $=id=>document.getElementById(id);
+
+  function conv(mm){ return unit==="mm" ? mm : mm/MM_PER_MIL; }
+  function fmt(mm){ return conv(mm).toFixed(unit==="mm"?3:1); }
+
+  function applyUnit(){
+    $("sbUnit").textContent=unit;
+    const unitsToggle=$("unitsToggle");
+    if(unitsToggle) unitsToggle.textContent=unit;
+    $("sbGrid").textContent = unit==="mm" ? "1.270 mm" : "50.0 mil";
+  }
+  const unitsToggle=$("unitsToggle");
+  if(unitsToggle){
+    unitsToggle.addEventListener("click",()=>{
+      unit = unit==="mm" ? "mil" : "mm"; applyUnit();
+    });
+  }
+
+  const sheet=document.getElementById("sheet");
+  function pos(e){
+    const r=sheet.getBoundingClientRect();
+    const fx=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));
+    const fy=Math.min(1,Math.max(0,(e.clientY-r.top)/r.height));
+    return {x:fx*A4_W_MM, y:fy*A4_H_MM};
+  }
+  sheet.addEventListener("mousemove",e=>{
+    const p=pos(e);
+    const dx=p.x-anchor.x, dy=p.y-anchor.y;
+    $("sbX").textContent=fmt(p.x);
+    $("sbY").textContent=fmt(p.y);
+    $("sbDX").textContent=fmt(dx);
+    $("sbDY").textContent=fmt(dy);
+    $("sbDist").textContent=fmt(Math.hypot(dx,dy));
+  });
+  sheet.addEventListener("mousedown",e=>{ Object.assign(anchor,pos(e)); });
+
+  applyUnit();
+})();
+
+/* ===== parametre dialog penceresi ===== */
+(function paramDialog(){
+  const dlg=document.getElementById("paramDialog");
+  const open=document.getElementById("openParams");
+  const closeBtns=[document.getElementById("dlgClose"),document.getElementById("dlgOk")];
+  const minBtn=document.querySelector(".dlg-min");
+  const reset=document.getElementById("dlgReset");
+  const bar=document.getElementById("dlgTitlebar");
+
+  const DEFAULTS={}; PARAMS.forEach(p=>DEFAULTS[p.id]=p.val);
+
+  const show=()=>dlg.hidden=false;
+  const hide=()=>dlg.hidden=true;
+  open.addEventListener("click",show);
+  closeBtns.forEach(b=>b.addEventListener("click",hide));
+  if(minBtn) minBtn.addEventListener("click",hide);
+  // şemaya çift tıkla → "sembol özellikleri" açılır (KiCad davranışı)
+  document.querySelectorAll(".sheet-canvas").forEach(c=>c.addEventListener("dblclick",show));
+
+  reset.addEventListener("click",()=>{
+    PARAMS.forEach(p=>{
+      S[p.id]=DEFAULTS[p.id];
+      const rng=document.getElementById("rng_"+p.id);
+      const val=document.getElementById("val_"+p.id);
+      if(rng) rng.value=DEFAULTS[p.id];
+      if(val) val.textContent=fmtParam(p,DEFAULTS[p.id]);
+    });
+    update();
+  });
+
+  // başlık çubuğundan sürükle
+  let drag=null;
+  bar.addEventListener("mousedown",e=>{
+    if(e.target.closest(".dlg-winbtns")) return;
+    const r=dlg.getBoundingClientRect();
+    drag={dx:e.clientX-r.left,dy:e.clientY-r.top};
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove",e=>{
+    if(!drag) return;
+    let x=e.clientX-drag.dx, y=e.clientY-drag.dy;
+    x=Math.max(0,Math.min(window.innerWidth-dlg.offsetWidth,x));
+    y=Math.max(0,Math.min(window.innerHeight-dlg.offsetHeight,y));
+    dlg.style.left=x+"px"; dlg.style.top=y+"px";
+  });
+  window.addEventListener("mouseup",()=>{ drag=null; });
+})();

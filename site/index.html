@@ -3,73 +3,208 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ortak Emetörlü Yükselteç Simülatörü</title>
+<title>Ortak Emetörlü Yükselteç</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="2" y="2" width="20" height="20" rx="3" stroke="#2bd17e" stroke-width="1.6"/>
-      <path d="M6 12h3l1.5-4 3 8 1.5-4h3" stroke="#2bd17e" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
-    </svg>
-    <div>
-      <h1>Ortak Emetörlü Yükselteç Simülatörü</h1>
-      <span class="sub">DC analiz &amp; AC küçük işaret (hibrit-π) analizi — Proje 4</span>
+
+<!-- ===== başlık + menü çubuğu ===== -->
+<div class="titlebar">
+  <span class="tb-name">Ortak Emetörlü Yükselteç</span>
+  <div class="tb-winbtns"><span>▁</span><span>▢</span><span class="x">✕</span></div>
+</div>
+<div class="menubar">
+  <nav class="mb-menu">
+    <span>Dosya</span><span>Düzen</span><span>Görünüm</span><span>Yerleştir</span>
+    <span>Denetle</span><span>Araçlar</span><span>Tercihler</span><span>Yardım</span>
+  </nav>
+</div>
+
+<!-- ===== üst araç çubuğu ===== -->
+<div class="toolbar-top">
+  <div class="tt-group">
+    <button class="tbtn" title="Yeni"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg></button>
+    <button class="tbtn" title="Aç"><svg viewBox="0 0 24 24"><path d="M3 6h6l2 2h10v11H3z"/></svg></button>
+    <button class="tbtn" title="Kaydet"><svg viewBox="0 0 24 24"><path d="M4 4h13l3 3v13H4z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg></button>
+    <button class="tbtn" title="Yazdır"><svg viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H4v-7h16v7h-3M7 14h10v6H7z"/></svg></button>
+  </div>
+  <div class="tt-sep"></div>
+  <div class="tt-group">
+    <button class="tbtn" title="Yakınlaştır"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M11 8v6M8 11h6M21 21l-5-5"/></svg></button>
+    <button class="tbtn" title="Uzaklaştır"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M21 21l-5-5"/></svg></button>
+    <button class="tbtn" title="Sayfaya sığdır"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  </div>
+  <div class="tt-sep"></div>
+  <div class="tt-group">
+    <button class="tbtn" title="Geri al"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10"/></svg></button>
+    <button class="tbtn" title="Yinele"><svg viewBox="0 0 24 24"><path d="M15 7l5 5-5 5M20 12H9a5 5 0 0 0 0 10"/></svg></button>
+  </div>
+  <div class="tt-sep"></div>
+  <div class="tt-group">
+    <button class="tbtn" title="ERC"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 5-3.5 7-8 8-4.5-1-8-3-8-8V7z"/><path d="M9 12l2 2 4-4"/></svg></button>
+    <button class="tbtn" title="Net listesi"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+    <button class="tbtn tbtn-blue" id="openParams" title="Simülatör · parametreleri düzenle">
+      <svg viewBox="0 0 24 24"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>
+    </button>
+  </div>
+  <div class="tt-spacer"></div>
+</div>
+
+<!-- ===== çalışma alanı ===== -->
+<div class="workspace">
+
+  <!-- sol ince araç çubuğu (birim + zoom) -->
+  <div class="toolbar-left">
+    <button class="lbtn" title="Izgara göster"><svg viewBox="0 0 24 24"><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></button>
+    <button class="lbtn" title="Izgara hizala"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="1"/><circle cx="12" cy="6" r="1"/><circle cx="18" cy="6" r="1"/><circle cx="6" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18" cy="12" r="1"/></svg></button>
+    <div class="lsep"></div>
+    <button class="lbtn" title="inç">in</button>
+    <button class="lbtn active" title="mil">mil</button>
+    <button class="lbtn" title="mm">mm</button>
+    <div class="lsep"></div>
+    <button class="lbtn" title="Tam ekran çapraz"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg></button>
+  </div>
+
+  <!-- tuval -->
+  <main class="canvas">
+    <div class="sheet" id="sheet">
+
+      <!-- hiyerarşik grup blokları -->
+      <div class="groups">
+
+        <!-- GRUP 1 -->
+        <section class="hgroup">
+          <div class="hg-head">
+            <div class="hg-title">Yükselteç Devresi</div>
+            <div class="hg-desc">Gerilim bölücü öngerilim (R₁/R₂), kollektör yükü R_C, emiter dejenerasyonu R_E, giriş/çıkış kuplaj (C_B/C_C) ve emiter baypas (C_E) kondansatörleri.</div>
+          </div>
+          <div class="hg-block">
+            <div class="hgb-title">U1 · Ortak Emetörlü Yükselteç (CE-AMP)</div>
+            <div class="sheet-canvas" id="schAmp"></div>
+          </div>
+        </section>
+
+        <!-- GRUP 2 -->
+        <section class="hgroup">
+          <div class="hg-head">
+            <div class="hg-title">DC Eşdeğer</div>
+            <div class="hg-desc">Kondansatörler açık devre. Thevenin gerilim bölücü ile baz öngerilimi; I_B, I_C, I_E akımları ve V_CE çalışma noktası belirlenir.</div>
+          </div>
+          <div class="hg-block">
+            <div class="hgb-title">U2 · DC Sessiz Çalışma Noktası (Q-POINT)</div>
+            <div class="sheet-canvas" id="schDC"></div>
+          </div>
+        </section>
+
+        <!-- GRUP 3 -->
+        <section class="hgroup">
+          <div class="hg-head">
+            <div class="hg-title">AC Eşdeğer</div>
+            <div class="hg-desc">Hibrit-π küçük işaret modeli. r_π, g_m·v_be bağımlı kaynağı ve r_o ile gerilim kazancı K_v, akım kazancı K_i ve dirençler.</div>
+          </div>
+          <div class="hg-block">
+            <div class="hgb-title">U3 · AC Hibrit-π Küçük İşaret (AC-MODEL)</div>
+            <div class="sheet-canvas" id="schAC"></div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- alt grup: sonuç tabloları (elle eklenmiş grafik) -->
+      <section class="hgroup wide results">
+        <div class="hg-head">
+          <div class="hg-title">Analiz Sonuçları</div>
+          <div class="hg-desc" id="regionBanner"></div>
+        </div>
+        <div class="res-row">
+          <div class="hg-block">
+            <div class="hgb-title">TABLO 1 · DC Çalışma Noktası</div>
+            <table class="ktable" id="resDC"></table>
+          </div>
+          <div class="hg-block">
+            <div class="hgb-title">TABLO 2 · AC Küçük İşaret</div>
+            <table class="ktable" id="resAC"></table>
+          </div>
+          <div class="hg-block plot-block">
+            <div class="hgb-title">GRAFİK 1 · Giriş/Çıkış Gerilimi vᵢ/vₒ(t)</div>
+            <div class="plot-wrap">
+              <canvas id="plot" width="960" height="248"></canvas>
+              <div class="legend">
+                <span class="lg"><i style="background:#2f9bef"></i> CH1 · v<sub>i</sub>(t)</span>
+                <span class="lg"><i style="background:#e02424"></i> CH2 · v<sub>o</sub>(t)</span>
+              </div>
+              <div class="clip-warn" id="clipWarn"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- sağ dikey araç çubuğu (KiCad) -->
+  <div class="toolbar-right">
+    <button class="rbtn active" title="Seç"><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6 1-1 6z"/></svg></button>
+    <div class="rsep"></div>
+    <button class="rbtn" title="Tel"><svg viewBox="0 0 24 24"><path d="M3 18h6l3-12h6"/><circle cx="3" cy="18" r="1.6"/><circle cx="21" cy="6" r="1.6"/></svg></button>
+    <button class="rbtn" title="Bus"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    <button class="rbtn" title="Bağlantı yok"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <button class="rbtn" title="Junction"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/></svg></button>
+    <div class="rsep"></div>
+    <button class="rbtn" title="Net etiketi"><svg viewBox="0 0 24 24"><path d="M3 12h7l3-4h8v8h-8l-3-4"/></svg></button>
+    <button class="rbtn" title="Global etiket"><svg viewBox="0 0 24 24"><path d="M2 12l4-4h14v8H6z"/></svg></button>
+    <button class="rbtn" title="Güç sembolü"><svg viewBox="0 0 24 24"><path d="M12 3v8M12 11l-5 6h10z"/></svg></button>
+    <div class="rsep"></div>
+    <button class="rbtn" title="Sembol ekle"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h4M16 12h4M12 4v4M12 16v4"/></svg></button>
+    <button class="rbtn" title="Metin"><svg viewBox="0 0 24 24"><path d="M5 6h14M12 6v13"/></svg></button>
+    <button class="rbtn" title="Tablo"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/></svg></button>
+    <button class="rbtn" title="Dikdörtgen"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12"/></svg></button>
+    <button class="rbtn" title="Çizgi"><svg viewBox="0 0 24 24"><path d="M4 20L20 4"/></svg></button>
+    <button class="rbtn" title="Görsel"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><circle cx="9" cy="10" r="2"/><path d="M5 18l5-4 4 3 3-2 2 3"/></svg></button>
+    <div class="rsep"></div>
+    <button class="rbtn" title="Sil"><svg viewBox="0 0 24 24"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13"/></svg></button>
+  </div>
+
+</div>
+
+<!-- ===== alt durum çubuğu ===== -->
+<div class="statusbar">
+  <span class="sb-cell" id="sbRegion">● AKTİF</span>
+  <span class="sb-spacer"></span>
+  <span class="sb-cell">Z <b id="sbZ">1.29</b></span>
+  <span class="sb-cell">X <b id="sbX">0.000</b></span>
+  <span class="sb-cell">Y <b id="sbY">0.000</b></span>
+  <span class="sb-cell">dx <b id="sbDX">0.000</b></span>
+  <span class="sb-cell">dy <b id="sbDY">0.000</b></span>
+  <span class="sb-cell">dist <b id="sbDist">0.000</b></span>
+  <span class="sb-cell">grid <b id="sbGrid">1.270 mm</b></span>
+  <span class="sb-cell sb-unit"><b id="sbUnit">mm</b></span>
+</div>
+
+<!-- ===== parametre aracı (KiCad dialog penceresi) ===== -->
+<div class="dialog" id="paramDialog" hidden>
+  <div class="dlg-titlebar" id="dlgTitlebar">
+    <span class="dlg-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#cfd6e6" stroke-width="2"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>
+      Simülasyon Parametreleri · Devre Sürücüsü
+    </span>
+    <div class="dlg-winbtns">
+      <button class="dlg-min" title="Küçült">▁</button>
+      <button class="dlg-x" id="dlgClose" title="Kapat">✕</button>
     </div>
   </div>
-  <div class="region-pill" id="regionPill"><span class="dot"></span><span id="regionText">AKTİF</span></div>
-</header>
-
-<main class="layout">
-
-  <!-- BLOCK 1: CE amplifier circuit + element sliders -->
-  <section class="block">
-    <div class="block-head"><span class="idx">1</span><h2>Ortak Emetörlü Yükselteç Devresi</h2></div>
-    <div class="schematic-wrap" id="schAmp"></div>
-    <div class="toolbar">
-      <h3>Eleman Değerleri (Araç Çubuğu)</h3>
-      <div class="controls" id="controls"></div>
-    </div>
-  </section>
-
-  <!-- BLOCK 2: DC equivalent + operating point -->
-  <section class="block">
-    <div class="block-head"><span class="idx">2</span><h2>DC Eş Değer Devre</h2></div>
-    <div class="schematic-wrap" id="schDC"></div>
-    <div class="readout">
-      <h3>Sessiz Çalışma Noktası &amp; Çalışma Bölgesi</h3>
-      <div class="metrics" id="dcMetrics"></div>
-      <div class="region-banner" id="regionBanner"></div>
-    </div>
-  </section>
-
-  <!-- BLOCK 3: AC equivalent + gains + waveform -->
-  <section class="block">
-    <div class="block-head"><span class="idx">3</span><h2>AC Eş Değer Devre (Hibrit-π)</h2></div>
-    <div class="schematic-wrap" id="schAC"></div>
-    <div class="readout">
-      <h3>Kazançlar &amp; Dirençler</h3>
-      <div class="metrics" id="acMetrics"></div>
-      <h3 class="plot-title">Giriş–Çıkış Gerilim Grafiği (zaman ekseni)</h3>
-      <div class="plot-wrap">
-        <canvas id="plot" width="760" height="190"></canvas>
-        <div class="legend">
-          <span class="lg"><i style="background:#1f5fd6"></i> v<sub>i</sub>(t) — giriş</span>
-          <span class="lg"><i style="background:#c0392b"></i> v<sub>o</sub>(t) — çıkış</span>
-        </div>
-        <div class="clip-warn" id="clipWarn"></div>
-      </div>
-    </div>
-  </section>
-
-</main>
-
-<footer class="foot">
-  Hibrit-π küçük işaret modeli · V<sub>BE</sub>≈0,7&nbsp;V · V<sub>T</sub>≈26&nbsp;mV — Sedra/Smith, Boylestad, IIT Bombay ders notu temelli.
-</footer>
+  <div class="dlg-tabs"><span class="dlg-tab active">Eleman Değerleri</span><span class="dlg-tab">İşaret</span></div>
+  <div class="dlg-body">
+    <div class="controls" id="controls"></div>
+  </div>
+  <div class="dlg-foot">
+    <span class="dlg-hint">Değerler anlık uygulanır · sürükle: başlık çubuğu</span>
+    <button class="dlg-btn" id="dlgReset">Varsayılan</button>
+    <button class="dlg-btn primary" id="dlgOk">Tamam</button>
+  </div>
+</div>
 
 <script src="app.js"></script>
 </body>
