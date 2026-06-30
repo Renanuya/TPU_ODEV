@@ -1,23 +1,23 @@
 :root{
   /* --- KiCad classic açık gri kabuk --- */
-  --chrome:#f0efe9;        /* menü/panel gri */
-  --chrome-2:#e7e6df;      /* toolbar */
-  --chrome-3:#dcdbd3;      /* girinti/hover */
-  --chrome-line:#b9b8ae;   /* ayraç */
+  --chrome:#f0efe9;        
+  --chrome-2:#e7e6df;      
+  --chrome-3:#dcdbd3;      
+  --chrome-line:#b9b8ae;   
   --chrome-text:#1f1f1c;
   --chrome-muted:#6d6c64;
-  --chrome-hi:#1a2db5;     /* KiCad mavi */
+  --chrome-hi:#1a2db5;     
   --titlebar:#d9d8d0;
-  --canvas-bg:#fbfbff;     /* açık tuval */
-  --grid-dot:#d6dbe8;      /* ince ızgara */
+  --canvas-bg:#fbfbff;     
+  --grid-dot:#d6dbe8;      
 
   /* --- KiCad şema renkleri --- */
-  --blue:#1a2db5;          /* grup çerçeve / başlık mavi */
+  --blue:#1a2db5;          
   --sheet:#ffffff;
-  --sch-bg:#fcf7c8;        /* ELEMAN dolgusu = soluk sarı (KiCad sembol gövdesi) */
-  --accent:#0a8a2f;        /* TEL yeşil */
-  --comp:#c01622;          /* ELEMAN kırmızı (KiCad) */
-  --accent-2:#15589e;      /* DEĞER mavi */
+  --sch-bg:#fcf7c8;        
+  --accent:#0a8a2f;        
+  --comp:#c01622;         
+  --accent-2:#15589e;      
   --rail:#c01622;
   --muted:#7a7a80;
   --text:#1f1f1c;
@@ -104,12 +104,10 @@ body{
 .toolbar-right{border-left:1px solid var(--chrome-line)}
 .lsep,.rsep{width:22px;height:1px;background:var(--chrome-line);margin:4px 0}
 
-/* tuval: açık zemin + ince ızgara */
 .canvas{flex:1;overflow:auto;background:var(--canvas-bg);
   background-image:radial-gradient(var(--grid-dot) 1px,transparent 1.3px);
   background-size:11px 11px;padding:20px;}
 
-/* ===== SHEET ===== */
 .sheet{
   position:relative;background:transparent;
   max-width:1700px;margin:0 auto;padding:6px;min-height:560px;
@@ -135,10 +133,8 @@ body{
   padding:5px 8px;border-bottom:1.2px solid var(--blue);background:#f4f6ff;
 }
 .sheet-canvas{position:relative;padding:10px}
-/* ortak viewBox (480x340) → 3 devre aynı alanı kaplar */
 .sheet-canvas svg{display:block;width:100%;height:auto}
 
-/* ===== sonuç grubu (alt, geniş) ===== */
 .hgroup.wide{grid-column:1/-1;margin-top:16px}
 .results .hg-desc{font-family:var(--sans);font-size:15px;font-weight:700;color:var(--blue);display:flex;align-items:center;justify-content:center;text-align:center}
 .results .hg-desc.sat{color:var(--blue)} .results .hg-desc.cut{color:var(--blue)}
@@ -176,7 +172,7 @@ body{
   .res-row>.hg-block:nth-child(1),.res-row>.hg-block:nth-child(2),.plot-block{grid-column:auto;grid-row:auto}
 }
 
-/* ===== şema primitifleri (JS sınıfları — KORUNUR) ===== */
+/* ===== şema primitifleri ===== */
 .wire{stroke:var(--accent);stroke-width:2.2;fill:none}
 .comp{stroke:var(--comp);stroke-width:2.2;fill:none}
 .comp-fill{fill:var(--comp)}
